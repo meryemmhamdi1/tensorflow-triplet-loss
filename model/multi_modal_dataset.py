@@ -28,10 +28,12 @@ import requests
 def calc_max_length(tensor):
     return max(len(t) for t in tensor)
 
+
 def download_image(url):
     img_data = requests.get(url).content
     with open('image_name.jpg', 'wb') as handler:
         handler.write(img_data)
+
 
 def decode_image_with_padding(im_file, decode_fn=tf.image.decode_jpeg, channels=3, pad_upto=500):
     im_orig = decode_fn(tf.io.read_file(im_file), channels=channels)
@@ -72,6 +74,7 @@ def decode_image_with_padding(im_file, decode_fn=tf.image.decode_jpeg, channels=
 
     return img_shape, img_padded
 
+
 def preprocess_tweets(tweets):
     # Choose the top 5000 words from the vocabulary
     top_k = 5000
@@ -90,6 +93,7 @@ def preprocess_tweets(tweets):
     # If you do not provide a max_length value, pad_sequences calculates it automatically
     tweet_vector = tf.keras.preprocessing.sequence.pad_sequences(train_seqs, padding='post')
 
+
     # Calculates the max_length, which is used to store the attention weights
     max_length = calc_max_length(train_seqs)
 
@@ -97,7 +101,8 @@ def preprocess_tweets(tweets):
 
 
 def dataset(directory, csv_file_path, anchor):
-    """ Read dataset which consists of tweets, images, user raw data or embeddings and their corresponding labels "user_id" """
+    """ Read dataset which consists of tweets, images, user raw data or embeddings and their corresponding
+     labels "user_id" """
 
     def decode_image(image):
         # Normalize from [0, 255] to [0.0, 1.0]
