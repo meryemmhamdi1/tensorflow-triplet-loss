@@ -37,16 +37,12 @@ if __name__ == '__main__':
                                     save_summary_steps=params.save_summary_steps)
     estimator = tf.estimator.Estimator(model_fn, params=params, config=config)
 
-    # Select the anchor at random:
-    for _ in range(0, 10):
-        anchor = random.choice(ANCHORS)
+    # Train the model
+    tf.logging.info("Starting training for {} epoch(s).".format(params.num_epochs))
+    estimator.train(lambda: train_input_fn(args.data_dir, params, anchor))
 
-        # Train the model
-        tf.logging.info("Starting training for {} epoch(s).".format(params.num_epochs))
-        estimator.train(lambda: train_input_fn(args.data_dir, params, anchor))
-
-        # Evaluate the model on the test set
-        tf.logging.info("Evaluation on test set.")
-        res = estimator.evaluate(lambda: test_input_fn(args.data_dir, params))
-        for key in res:
-            print("{}: {}".format(key, res[key]))
+    # Evaluate the model on the test set
+    tf.logging.info("Evaluation on test set.")
+    res = estimator.evaluate(lambda: test_input_fn(args.data_dir, params))
+    for key in res:
+        print("{}: {}".format(key, res[key]))
