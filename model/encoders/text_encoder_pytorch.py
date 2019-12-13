@@ -1,5 +1,5 @@
-import torch
 from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM
+import torch
 
 
 def process_bert_tokenize(text):
@@ -46,4 +46,5 @@ def process_bert_tokenize(text):
 
 if __name__ == "__main__":
     text = "Here is the sentence I want embeddings for."
+
     print(process_bert_tokenize(text))

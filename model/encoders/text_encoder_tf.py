@@ -6,12 +6,7 @@ import sys
 
 sys.path.append('bert/')
 
-import codecs
 import collections
-import json
-import re
-import os
-import pprint
 import numpy as np
 import tensorflow as tf
 
@@ -27,7 +22,7 @@ BERT_MODEL = 'uncased_L-12_H-768_A-12' #@param {type:"string"}
 BERT_PRETRAINED_DIR = 'gs://cloud-tpu-checkpoints/bert/' + BERT_MODEL
 print('***** BERT pretrained directory: {} *****'.format(BERT_PRETRAINED_DIR))
 
-LAYERS = [-1,-2,-3,-4]
+LAYERS = [-1, -2, -3, -4]
 NUM_TPU_CORES = 8
 MAX_SEQ_LENGTH = 87
 BERT_CONFIG = BERT_PRETRAINED_DIR + '/bert_config.json'
@@ -104,8 +99,7 @@ def input_fn_builder(features, seq_length):
     return input_fn
 
 
-def model_fn_builder(bert_config, init_checkpoint, layer_indexes, use_tpu,
-                     use_one_hot_embeddings):
+def model_fn_builder(bert_config, init_checkpoint, layer_indexes, use_tpu, use_one_hot_embeddings):
     """Returns `model_fn` closure for TPUEstimator."""
 
     def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
@@ -274,6 +268,7 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
         else:
             tokens_b.pop()
 
+
 def read_sequence(input_sentences):
     examples = []
     unique_id = 0
@@ -346,7 +341,9 @@ def get_features(input_text, dim=768):
     return output
 
 
-embeddings = get_features(["This is a test"])
+if __name__ == "__main__":
+    print("Getting embeddings for sentence:")
+    embeddings = get_features(["This is a test"])
 
 
 
