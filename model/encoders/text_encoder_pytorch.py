@@ -38,9 +38,12 @@ def process_bert_tokenize(text):
     # create a new dimension in the tensor.
     token_embeddings = torch.stack(encoded_layers, dim=0)
 
+    print("token_embeddings:", token_embeddings)
+    print("token_embeddings.shape:", token_embeddings.shape)
+
     return token_embeddings
 
 
 if __name__ == "__main__":
     text = "Here is the sentence I want embeddings for."
-    process_bert_tokenize(text)
+    print(process_bert_tokenize(text))
