@@ -6,7 +6,7 @@ def process_bert_tokenize(text):
     marked_text = "[CLS] " + text + " [SEP]"
 
     # Load pre-trained model tokenizer (vocabulary)
-    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased')
+    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-uncased')
 
     # Tokenize our sentence with the BERT tokenizer.
     tokenized_text = tokenizer.tokenize(marked_text)
@@ -24,7 +24,7 @@ def process_bert_tokenize(text):
     print("Loading Model")
 
     # Load pre-trained model (weights)
-    model = BertModel.from_pretrained('bert-base-multilingual-cased')
+    model = BertModel.from_pretrained('bert-base-multilingual-uncased')
 
     # Put the model in "evaluation" mode, meaning feed-forward operation.
     print("Evaluating the model")
