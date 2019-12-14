@@ -22,10 +22,9 @@ import tensorflow as tf
 import pandas as pd
 from sklearn.model_selection import train_test_split
 import requests
-from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM
 from tqdm import tqdm
 import torch
-
+import ast
 
 # Find the maximum length of any tweet in our dataset
 def calc_max_length(tensor):
@@ -38,8 +37,8 @@ def download_image(url):
         handler.write(img_data)
 
 
-def decode_image_with_padding(im_file, decode_fn=tf.image.decode_jpeg, channels=3, pad_upto=500):
-    im_orig = decode_fn(tf.io.read_file(im_file), channels=channels)
+def decode_image_with_padding(im_file, decode_fn=tf.image.decode_jpeg, channels=3, pad_upto=3000):
+    im_orig = decode_fn(tf.io.read_file(im_file))
     img_shape = tf.shape(im_orig)[0:2]
 
     pad_h = pad_upto - img_shape[0]
@@ -75,7 +74,7 @@ def decode_image_with_padding(im_file, decode_fn=tf.image.decode_jpeg, channels=
 
         img_padded = tf.stack([padded_R], axis=2)
 
-    return img_shape, img_padded
+    return img_padded
 
 
 def preprocess_tweets(tweets):
@@ -102,31 +101,36 @@ def preprocess_tweets(tweets):
     return tweet_vector, max_length
 
 
-def dataset(directory, csv_file_path, bert_model):
+def dataset(directory, csv_file_path, embed_dir, embed_file):
     """ Read dataset which consists of tweets, images, user raw data or embeddings and their corresponding
      labels "user_id" """
 
+    """
     # Load pre-trained model tokenizer (vocabulary)
     tokenizer = BertTokenizer.from_pretrained(bert_model)
 
     # Load pre-trained model (weights)
     print("Loading Model")
     model = BertModel.from_pretrained(bert_model)
+    """
 
     def decode_image(image):
         # Normalize from [0, 255] to [0.0, 1.0]
-        image = tf.decode_raw(directory + image, tf.uint8)
-        image = tf.cast(image, tf.float32)
-        image = tf.reshape(image, [784])
-        image = tf.keras.applications.inception_v3.preprocess_input(image)
-        print("image.shape:", image.shape)
-        return image / 255.0
+        image = tf.image.decode_jpeg(tf.io.read_file(image), channels=3)
+        image = tf.image.resize_images(image, size=[300, 300], method=tf.image.ResizeMethod.BILINEAR,
+                               align_corners=False)
+        return image
 
     def decode_label(label):
         label = tf.reshape(label, [])  # label is a scalar
         return tf.to_int32(label)
 
+    def decode_team(label):
+        return tf.one_hot(label, 16)
+
+    """
     def process_bert_tokenize(text):
+
         marked_text = "[CLS] " + text + " [SEP]"
 
         # Tokenize our sentence with the BERT tokenizer.
@@ -153,20 +157,42 @@ def dataset(directory, csv_file_path, bert_model):
         sentence_embeddings = tf.convert_to_tensor(np.array(np.squeeze(pooled_output.numpy())), dtype=tf.float32)
         return sentence_embeddings
 
+    """
+
+    def get_bert_embeddings(index):
+        text_emb = np.load(embed_dir+embed_file)["arr_0"][index]
+        return text_emb
+
     data = pd.read_csv(os.path.join(directory, csv_file_path))
+    data["index"] = list(data.index)
 
-    images = tf.data.Dataset.from_tensor_slices(list(data["image_paths"])).map(decode_image)
-    labels = tf.data.Dataset.from_tensor_slices(list(data["user_id"])).map(decode_label)
-    tweets = tf.data.Dataset.from_tensor_slices(list(data["text"])).map(process_bert_tokenize)
-
-    return tf.data.Dataset.zip((images, tweets, labels))
+    tf.logging.info("Reading the tweets...")
+    tweets_embed = np.array([get_bert_embeddings(data["index"].iloc[i]) for i in range(0, len(data))])
+    tweets = tf.data.Dataset.from_tensor_slices(tweets_embed)
 
 
-def train(directory, bert_model):
+    tf.logging.info("Reading the images...")
+    images = tf.data.Dataset.from_tensor_slices(["/Users/d22admin/USCGDrive/BeyondAssignment/"+el for el in
+                                                 list(data["image_paths"])]).map(decode_image)
+
+    tf.logging.info("Reading the labels...")
+    user_ids = tf.data.Dataset.from_tensor_slices(list(data["user_id"])).map(decode_label)
+
+
+    tf.logging.info("Reading the teams one hot encoding...")
+    teams = tf.data.Dataset.from_tensor_slices([ast.literal_eval(el) for el in list(data["teams_one_hot"])])
+
+
+    tf.logging.info("Finished reading tweets embeddings ...")
+
+    return tf.data.Dataset.zip((images, tweets, user_ids, teams))
+
+
+def train(directory, embed_dir):
     """tf.data.Dataset object for multi-modal training data."""
-    return dataset(directory, 'df_tripets_train.csv', bert_model)
+    return dataset(directory, 'df_tripets_with_teams_0_2k_train.csv', embed_dir, "text_emb_train_2k_bert_base_cased.npz")
 
 
-def test(directory, bert_model):
+def test(directory, embed_dir):
     """tf.data.Dataset object for multi-modal test data."""
-    return dataset(directory, 'df_tripets_test.csv', bert_model)
+    return dataset(directory, 'df_tripets_with_teams_0_2k_test.csv', embed_dir, "text_emb_test_2k_bert_base_cased.npz")

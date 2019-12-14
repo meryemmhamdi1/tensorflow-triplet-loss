@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
     # Load dataset
     print("Loading data")
-    data = pd.read_csv("/Users/d22admin/USCGDrive/BeyondAssignment/IntermediateData/tweets_images_user_id_triplets.csv")
+    data = pd.read_csv("/Users/d22admin/USCGDrive/BeyondAssignment/IntermediateData/df_tripets_with_teams_0_2k_test.csv")
 
     print("Getting embeddings for the tweets")
     tweet_arr_vec = []
@@ -73,7 +73,7 @@ if __name__ == "__main__":
 
     print("Saving the embeddings in a numpy array")
 
-    savez_compressed('/Users/d22admin/USCGDrive/BeyondAssignment/Deliverables/Embeddings/text_embeddings_bert_base_cased.npz',
-                     tweet_arr_vec)
+    savez_compressed('/Users/d22admin/USCGDrive/BeyondAssignment/Deliverables/Embeddings/'
+                     'text_emb_test_2k_bert_base_cased.npz', tweet_arr_vec)
 
 

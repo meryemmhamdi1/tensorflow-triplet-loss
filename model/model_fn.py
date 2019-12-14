@@ -18,7 +18,6 @@ def build_model(is_training, images, params):
     Returns:
         output: (tf.Tensor) output of the model
     """
-    out = images
     # Define the number of channels of each convolution
     # For each block, we do: 3x3 conv -> batch norm -> relu -> 2x2 maxpool
     num_channels = params.num_channels
@@ -26,15 +25,17 @@ def build_model(is_training, images, params):
     channels = [num_channels, num_channels * 2]
     for i, c in enumerate(channels):
         with tf.variable_scope('block_{}'.format(i+1)):
-            out = tf.layers.conv2d(out, c, 3, padding='same')
+            out = tf.layers.conv2d(images, c, 3, padding='same')
             if params.use_batch_norm:
                 out = tf.layers.batch_normalization(out, momentum=bn_momentum, training=is_training)
             out = tf.nn.relu(out)
             out = tf.layers.max_pooling2d(out, 2, 2)
 
-    assert out.shape[1:] == [7, 7, num_channels * 2]
+    print("out.shape:", out.shape)
 
-    out = tf.reshape(out, [-1, 7 * 7 * num_channels * 2])
+    #assert out.shape[1:] == [7, 7, num_channels * 2]
+
+    #out = tf.reshape(out, [-1, out.shape[1] * out.shape[2] * out.shape[3]])
     with tf.variable_scope('fc_1'):
         out = tf.layers.dense(out, params.embedding_size)
 
@@ -57,42 +58,50 @@ class TripletLoss:
         self.is_training = tf.placeholder(dtype=tf.bool, name='is_training')
         self.sec_mod = tf.placeholder(dtype=tf.string, name='second_mod')
 
-        self.images = tf.placeholder(shape=(None, 784), dtype=tf.float32, name='input_images')
+        self.images = tf.placeholder(shape=(None, None, None, 3), dtype=tf.float32, name='input_images')
+
         self.tweets = tf.placeholder(shape=(None, 768), dtype=tf.float32, name='input_tweets')
 
-        self.labels = tf.placeholder(shape=(None, None), dtype=tf.int32, name='input_labels')
+        self.user_ids = tf.placeholder(shape=(None, ), dtype=tf.int32, name='user_ids')
+        self.team_one_hot = tf.placeholder(shape=(None, 16), dtype=tf.int32, name='user_ids')
 
         # Dense Layers to unify dimensionalities
-        images_dense = tf.keras.layers.Dense(128, activation='relu')(self.images)
         tweets_dense = tf.keras.layers.Dense(128, activation='relu')(self.tweets)
+
+        images_reshaped = tf.reshape(self.images, [-1, params.image_size, params.image_size, 1])
+        assert images_reshaped.shape[1:] == [params.image_size, params.image_size, 1], "{}".format(images_reshaped.shape)
 
         # -----------------------------------------------------------
         # MODEL: define the layers of the model
         with tf.variable_scope('model'):
             # Compute the embeddings with the model
-            embeddings_images = build_model(self.is_training, images_dense, params)
-            embeddings_tweets = build_model(self.is_training, tweets_dense, params)
+            print("images_dense.shape:", self.images.shape)
+            embeddings_images = build_model(self.is_training, self.images, params)
 
-        embeddings = {"image": embeddings_images, "tweet": embeddings_tweets}
+        images_dense = tf.keras.layers.Dense(128, activation='relu')(embeddings_images)
 
-        embedding_images_mean_norm = tf.reduce_mean(tf.norm(embeddings_images, axis=1))
+        embeddings = {"image": images_dense, "tweet": tweets_dense}
+
+        embedding_images_mean_norm = tf.reduce_mean(tf.norm(images_dense, axis=1))
         tf.summary.scalar("embedding_images_mean_norm", embedding_images_mean_norm)
 
-        embedding_tweets_mean_norm = tf.reduce_mean(tf.norm(embeddings_tweets, axis=1))
+        embedding_tweets_mean_norm = tf.reduce_mean(tf.norm(tweets_dense, axis=1))
         tf.summary.scalar("embedding_tweets_mean_norm", embedding_tweets_mean_norm)
 
+        """
         if not self.is_training:
-            predictions = {'tweets embeddings': embeddings_tweets, "images embeddings": embeddings_images}
+            predictions = {'tweets embeddings': tweets_dense, "images embeddings": images_dense}
             return predictions
+        """
 
-        labels = tf.cast(self.labels, tf.int64)
+        labels = tf.cast(self.user_ids, tf.int64)
 
         # Define triplet loss
         if params.triplet_strategy == "batch_all":
-            self.loss, fraction = batch_all_triplet_loss(labels, embeddings[self.sec_mod], margin=params.margin,
+            self.loss, fraction = batch_all_triplet_loss(labels, embeddings["tweet"], margin=params.margin,
                                                     squared=params.squared)
         elif params.triplet_strategy == "batch_hard":
-            self.loss = batch_hard_triplet_loss(labels, embeddings[self.sec_mod], margin=params.margin,
+            self.loss = batch_hard_triplet_loss(labels, embeddings["tweet"], margin=params.margin,
                                                 squared=params.squared)
         else:
             raise ValueError("Triplet strategy not recognized: {}".format(params.triplet_strategy))
@@ -103,7 +112,7 @@ class TripletLoss:
         # TODO: some other metrics like rank-1 accuracy?
         with tf.variable_scope("metrics"):
             norm_dict = {"image": embedding_images_mean_norm, "tweet": embedding_tweets_mean_norm}
-            norm = norm_dict[self.sec_mod]
+            norm = norm_dict["image"]
             self.eval_metric_ops = {"embedding_images_mean_norm": tf.metrics.mean(norm)}
 
             if params.triplet_strategy == "batch_all":

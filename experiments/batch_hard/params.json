@@ -12,7 +12,7 @@
     "squared": false,
 
     "image_size": 28,
-    "num_labels": 10,
+    "num_labels": 16,
     "train_size": 50000,
     "eval_size": 10000,
 
