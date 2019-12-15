@@ -66,7 +66,7 @@ class TripletLoss:
 
         self.user_ids = tf.placeholder(shape=(None, ), dtype=tf.int32, name='user_ids')
 
-        self.team_one_hot = tf.placeholder(shape=(None, ), dtype=tf.int32, name='user_ids')
+        self.team = tf.placeholder(shape=(None, ), dtype=tf.int64, name='user_ids')
 
         # Dense Layers to unify dimensionalities
         self.tweets_dense = tf.keras.layers.Dense(128, activation='relu')(self.tweets)
@@ -84,7 +84,7 @@ class TripletLoss:
         """
 
         self.images_dense = tf.keras.layers.Dense(128, activation='relu')(self.images)
-        self.user_dense = self.images_dense #tf.keras.layers.Embedding(10000, 128)(self.user_ids)
+        self.user_dense = tf.keras.layers.Embedding(200000, 128)(self.user_ids)
         #self.users_dense = tf.keras.layers.Dense(128, activation='relu')(self.user_emb)
 
         embeddings = {"image": self.images_dense, "tweet": self.tweets_dense, "user": self.user_dense}
@@ -101,7 +101,7 @@ class TripletLoss:
             return predictions
         """
 
-        labels = tf.cast(self.team_one_hot, tf.int64)
+        labels = tf.cast(self.team, tf.int64)
 
         anchor_emb = tf.cond(tf.equal(self.anchor_mode, tf.constant(0, dtype=tf.int32)), lambda: embeddings["tweet"],
                              lambda: tf.cond(tf.equal(self.anchor_mode, tf.constant(1, dtype=tf.int32)),
@@ -124,6 +124,21 @@ class TripletLoss:
         else:
             raise ValueError("Triplet strategy not recognized: {}".format(params.triplet_strategy))
 
+        all_modes_hidden = tf.concat([self.tweets_dense, self.images_dense, self.user_dense], 1)
+        print("all_modes_hidden.shape:", all_modes_hidden.shape)
+        weights_output_layer = tf.Variable(initial_value=np.zeros((3*128, 16)), dtype ='float32')
+        bias_output_layer = tf.Variable(initial_value=np.zeros((1, 16)), dtype='float32')
+        output_logits = tf.matmul(all_modes_hidden, weights_output_layer) + bias_output_layer
+        self.pred_y = tf.nn.softmax(output_logits)
+        self.pred = tf.argmax(self.pred_y, axis=-1)
+
+        one_hot_labels = tf.one_hot(self.team, depth=16, axis=-1)
+        self.class_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2
+                                         (labels=one_hot_labels, logits=output_logits))
+        print("self.pred:", self.pred)
+        print("self.team:", self.team)
+        self.class_acc = tf.reduce_mean((tf.cast(tf.equal(self.pred, self.team), tf.float32)))
+
         # -----------------------------------------------------------
         # METRICS AND SUMMARIES
         # Metrics for evaluation using tf.metrics (average over whole dataset)
@@ -144,12 +159,13 @@ class TripletLoss:
         # Define training step that minimizes the loss with the Adam optimizer
         optimizer = tf.train.AdamOptimizer(params.learning_rate)
         global_step = tf.train.get_global_step()
+        self.total_loss = self.loss+self.class_loss
         if params.use_batch_norm:
             # Add a dependency to update the moving mean and variance for batch normalization
             with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-                self.train_op = optimizer.minimize(self.loss, global_step=global_step)
+                self.train_op = optimizer.minimize(self.total_loss, global_step=global_step)
         else:
-            self.train_op = optimizer.minimize(self.loss, global_step=global_step)
+            self.train_op = optimizer.minimize(self.total_loss, global_step=global_step)
 
     def save(self, model_out_file, sess):
         """Saves model parameters to disk."""

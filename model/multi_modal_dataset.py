@@ -121,8 +121,12 @@ def dataset(directory, csv_file_path, embed_dir, text_embed_file, img_embed_file
         index = list(map(lambda i: i > 0.6, l)).index(True)
         return index
 
+    def list_to_dict(l):
+        op = {l[i]: i for i in range(0, len(l))}
+        return op
+
     tf.logging.info("Reading the dataset...")
-    data = pd.read_csv(os.path.join(directory, csv_file_path), nrows=500)
+    data = pd.read_csv(os.path.join(directory, csv_file_path))
     data["index"] = list(data.index)
 
     tf.logging.info("Reading the tweets...")
@@ -134,7 +138,10 @@ def dataset(directory, csv_file_path, embed_dir, text_embed_file, img_embed_file
     images = tf.data.Dataset.from_tensor_slices(img_embed)
 
     tf.logging.info("Reading the labels...")
-    user_ids = tf.data.Dataset.from_tensor_slices(list(data["user_id"])).map(decode_label)
+    user_list = list(set(list(data["user_id"])))
+    user_dict = list_to_dict(user_list)
+    user_list_small = [user_dict[el] for el in user_list]
+    user_ids = tf.data.Dataset.from_tensor_slices(user_list_small).map(decode_label)
 
     tf.logging.info("Reading the teams one hot encoding...")
     teams = tf.data.Dataset.from_tensor_slices([get_index_one(el) for el in list(data['teams_one_hot'])])
