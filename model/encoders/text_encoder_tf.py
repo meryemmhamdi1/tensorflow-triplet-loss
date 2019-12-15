@@ -136,7 +136,7 @@ def model_fn_builder(bert_config, init_checkpoint, layer_indexes, use_tpu, use_o
         else:
             tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
 
-        tf.logging.info("**** Trainable Variables ****")
+        #tf.logging.info("**** Trainable Variables ****")
         for var in tvars:
             init_string = ""
             if var.name in initialized_variable_names:

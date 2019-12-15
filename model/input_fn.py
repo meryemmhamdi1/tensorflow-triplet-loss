@@ -12,11 +12,11 @@ def train_input_fn(data_dir, params, embed_dir):
         params: (Params) contains hyperparameters of the model (ex: `params.num_epochs`)
     """
     dataset = multi_modal_dataset.train(data_dir, embed_dir)
-    tf.logging.info("The train dataset was read already...")
-    dataset = dataset.shuffle(params.train_size)  # whole dataset into the buffer
+    #tf.logging.info("The train dataset was read already...")
     dataset = dataset.repeat(params.num_epochs)  # repeat for multiple epochs
+    dataset = dataset.shuffle(params.train_size)  # whole dataset into the buffer
     dataset = dataset.batch(params.batch_size)
-    #tweets = tweets.prefetch(1)  # make sure you always have one batch ready to serve
+    dataset= dataset.prefetch(1)  # make sure you always have one batch ready to serve
     dataset = dataset.make_initializable_iterator()
 
     return dataset
@@ -31,6 +31,7 @@ def test_input_fn(data_dir, params, embed_dir):
     """
     dataset = multi_modal_dataset.test(data_dir, embed_dir)
     dataset = dataset.batch(params.batch_size)
-    dataset = dataset.make_initializable_iterator() #prefetch(1) # make sure you always have one batch ready to serve
+    dataset = dataset.prefetch(1) # make sure you always have one batch ready to serve
+    dataset = dataset.make_initializable_iterator()
 
     return dataset

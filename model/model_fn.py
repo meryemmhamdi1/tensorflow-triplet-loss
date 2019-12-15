@@ -4,6 +4,7 @@ import tensorflow as tf
 
 from model.triplet_loss import batch_all_triplet_loss
 from model.triplet_loss import batch_hard_triplet_loss
+import numpy as np
 
 
 def build_model(is_training, images, params):
@@ -56,18 +57,20 @@ class TripletLoss:
 
         """
         self.is_training = tf.placeholder(dtype=tf.bool, name='is_training')
-        self.sec_mod = tf.placeholder(dtype=tf.string, name='second_mod')
+        self.anchor_mode = tf.placeholder(dtype=tf.string, shape=[], name='anchor_mode')
+        self.opt_mode = tf.placeholder(dtype=tf.string, shape=[], name='opt_mode')
 
-        self.images = tf.placeholder(shape=(None, None, None, 3), dtype=tf.float32, name='input_images')
+        self.images = tf.placeholder(shape=(None, 2048), dtype=tf.float32, name='input_images')
 
         self.tweets = tf.placeholder(shape=(None, 768), dtype=tf.float32, name='input_tweets')
 
         self.user_ids = tf.placeholder(shape=(None, ), dtype=tf.int32, name='user_ids')
-        self.team_one_hot = tf.placeholder(shape=(None, 16), dtype=tf.int32, name='user_ids')
+        self.team_one_hot = tf.placeholder(shape=(None, ), dtype=tf.int32, name='user_ids')
 
         # Dense Layers to unify dimensionalities
-        tweets_dense = tf.keras.layers.Dense(128, activation='relu')(self.tweets)
+        self.tweets_dense = tf.keras.layers.Dense(128, activation='relu')(self.tweets)
 
+        """
         images_reshaped = tf.reshape(self.images, [-1, params.image_size, params.image_size, 1])
         assert images_reshaped.shape[1:] == [params.image_size, params.image_size, 1], "{}".format(images_reshaped.shape)
 
@@ -77,15 +80,16 @@ class TripletLoss:
             # Compute the embeddings with the model
             print("images_dense.shape:", self.images.shape)
             embeddings_images = build_model(self.is_training, self.images, params)
+        """
 
-        images_dense = tf.keras.layers.Dense(128, activation='relu')(embeddings_images)
+        self.images_dense = tf.keras.layers.Dense(128, activation='relu')(self.images)
 
-        embeddings = {"image": images_dense, "tweet": tweets_dense}
+        embeddings = {"image": self.images_dense, "tweet": self.tweets_dense}
 
-        embedding_images_mean_norm = tf.reduce_mean(tf.norm(images_dense, axis=1))
+        embedding_images_mean_norm = tf.reduce_mean(tf.norm(self.images_dense, axis=1))
         tf.summary.scalar("embedding_images_mean_norm", embedding_images_mean_norm)
 
-        embedding_tweets_mean_norm = tf.reduce_mean(tf.norm(tweets_dense, axis=1))
+        embedding_tweets_mean_norm = tf.reduce_mean(tf.norm(self.tweets_dense, axis=1))
         tf.summary.scalar("embedding_tweets_mean_norm", embedding_tweets_mean_norm)
 
         """
@@ -94,15 +98,22 @@ class TripletLoss:
             return predictions
         """
 
-        labels = tf.cast(self.user_ids, tf.int64)
+        labels = tf.cast(self.team_one_hot, tf.int64)
+
+        anchor_emb = tf.cond(self.anchor_mode == "image", embeddings["image"], embeddings["tweet"])
+        opt_emb = tf.cond(self.opt_mode == "image", embeddings["image"], embeddings["tweet"])
 
         # Define triplet loss
         if params.triplet_strategy == "batch_all":
-            self.loss, fraction = batch_all_triplet_loss(labels, embeddings["tweet"], margin=params.margin,
+            self.loss, fraction = batch_all_triplet_loss(labels, anchor_emb, opt_emb, margin=params.margin,
                                                     squared=params.squared)
+
+            #self.loss, fraction = batch_all_triplet_loss(labels, embeddings["image"], margin=params.margin, squared=params.squared)
         elif params.triplet_strategy == "batch_hard":
-            self.loss = batch_hard_triplet_loss(labels, embeddings["tweet"], margin=params.margin,
+            self.loss = batch_hard_triplet_loss(labels, anchor_emb, opt_emb, margin=params.margin,
                                                 squared=params.squared)
+
+            #self.loss = batch_hard_triplet_loss(labels, embeddings["image"], margin=params.margin, squared=params.squared)
         else:
             raise ValueError("Triplet strategy not recognized: {}".format(params.triplet_strategy))
 
@@ -133,4 +144,8 @@ class TripletLoss:
         else:
             self.train_op = optimizer.minimize(self.loss, global_step=global_step)
 
-
+    def save(self, model_out_file, sess):
+        """Saves model parameters to disk."""
+        variables_dict = {v.name: v for v in tf.global_variables()}
+        values_dict = sess.run(variables_dict)
+        np.savez(open(model_out_file, 'wb'), **values_dict)
