@@ -58,13 +58,13 @@ if __name__ == '__main__':
         index = list(map(lambda i: i > 0.6, l)).index(True)
         return index
 
-    df_subset['TEAMs'] = 2*[teams[get_index_one(el)] for el in list(data['teams_one_hot'])]
+    df_subset['TEAMS'] = 2*[teams[get_index_one(el)] for el in list(data['teams_one_hot'])]
     df_subset['User ID'] = 2*list(data['user_id'])
     plt.figure(figsize=(16, 10))
     sns.scatterplot(
         x="x", y="y",
-        hue="DOTA Team",
-        style="mode",
+        hue="TEAMS",
+        style="MODALITIES",
         #palette=sns.color_palette("hls", len(set(list(data['user_id'])))),
         palette=sns.color_palette("hls", 16),
         data=df_subset,

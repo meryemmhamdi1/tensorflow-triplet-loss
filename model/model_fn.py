@@ -57,14 +57,15 @@ class TripletLoss:
 
         """
         self.is_training = tf.placeholder(dtype=tf.bool, name='is_training')
-        self.anchor_mode = tf.placeholder(dtype=tf.string, shape=[], name='anchor_mode')
-        self.opt_mode = tf.placeholder(dtype=tf.string, shape=[], name='opt_mode')
+        self.anchor_mode = tf.placeholder(dtype=tf.int32, shape=[], name='anchor_mode')
+        self.opt_mode = tf.placeholder(dtype=tf.int32, shape=[], name='opt_mode')
 
         self.images = tf.placeholder(shape=(None, 2048), dtype=tf.float32, name='input_images')
 
         self.tweets = tf.placeholder(shape=(None, 768), dtype=tf.float32, name='input_tweets')
 
         self.user_ids = tf.placeholder(shape=(None, ), dtype=tf.int32, name='user_ids')
+
         self.team_one_hot = tf.placeholder(shape=(None, ), dtype=tf.int32, name='user_ids')
 
         # Dense Layers to unify dimensionalities
@@ -83,8 +84,10 @@ class TripletLoss:
         """
 
         self.images_dense = tf.keras.layers.Dense(128, activation='relu')(self.images)
+        self.user_dense = self.images_dense #tf.keras.layers.Embedding(10000, 128)(self.user_ids)
+        #self.users_dense = tf.keras.layers.Dense(128, activation='relu')(self.user_emb)
 
-        embeddings = {"image": self.images_dense, "tweet": self.tweets_dense}
+        embeddings = {"image": self.images_dense, "tweet": self.tweets_dense, "user": self.user_dense}
 
         embedding_images_mean_norm = tf.reduce_mean(tf.norm(self.images_dense, axis=1))
         tf.summary.scalar("embedding_images_mean_norm", embedding_images_mean_norm)
@@ -100,8 +103,12 @@ class TripletLoss:
 
         labels = tf.cast(self.team_one_hot, tf.int64)
 
-        anchor_emb = tf.cond(self.anchor_mode == "image", embeddings["image"], embeddings["tweet"])
-        opt_emb = tf.cond(self.opt_mode == "image", embeddings["image"], embeddings["tweet"])
+        anchor_emb = tf.cond(tf.equal(self.anchor_mode, tf.constant(0, dtype=tf.int32)), lambda: embeddings["tweet"],
+                             lambda: tf.cond(tf.equal(self.anchor_mode, tf.constant(1, dtype=tf.int32)),
+                                     lambda: embeddings["image"], lambda: embeddings["user"]))
+        opt_emb = tf.cond(tf.equal(self.opt_mode, tf.constant(0, dtype=tf.int32)), lambda: embeddings["tweet"],
+                          lambda: tf.cond(tf.equal(self.opt_mode, tf.constant(1, dtype=tf.int32)),
+                                  lambda: embeddings["image"], lambda: embeddings["user"]))
 
         # Define triplet loss
         if params.triplet_strategy == "batch_all":

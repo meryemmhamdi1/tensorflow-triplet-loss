@@ -26,7 +26,7 @@ parser.add_argument('--embed_dir', default='/Users/d22admin/USCGDrive/BeyondAssi
 parser.add_argument("--bert_model", default="bert-base-cased")
 
 
-ANCHORS = ["tweet", "image"]
+ANCHORS = [0, 1] # 0 for "tweet", 1 for "image", 2 for "user"
 if __name__ == '__main__':
     tf.reset_default_graph()
     #tf.logging.set_verbosity(tf.logging.INFO)
@@ -59,7 +59,8 @@ if __name__ == '__main__':
 
             fd_train = {
                 model.is_training: True,
-                model.sec_mod: random.choice(ANCHORS),
+                model.anchor_mode: random.choice(ANCHORS),
+                model.opt_mode: random.choice(ANCHORS),
                 model.images: train[0],
                 model.tweets: train[1],
                 model.user_ids: train[2],
@@ -91,7 +92,7 @@ if __name__ == '__main__':
         fd_train = {
             model.is_training: False,
             model.anchor_mode: random.choice(ANCHORS),
-            model.opt_mod: random.choice(ANCHORS),
+            model.opt_mode: random.choice(ANCHORS),
             model.images: train[0],
             model.tweets: train[1],
             model.user_ids: train[2],
@@ -125,7 +126,8 @@ if __name__ == '__main__':
 
         fd_test = {
             model.is_training: False,
-            model.sec_mod: random.choice(ANCHORS),
+            model.anchor_mode: random.choice(ANCHORS),
+            model.opt_mode: random.choice(ANCHORS),
             model.images: test[0],
             model.tweets: test[1],
             model.user_ids: test[2],

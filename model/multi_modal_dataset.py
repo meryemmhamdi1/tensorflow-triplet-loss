@@ -122,7 +122,7 @@ def dataset(directory, csv_file_path, embed_dir, text_embed_file, img_embed_file
         return index
 
     tf.logging.info("Reading the dataset...")
-    data = pd.read_csv(os.path.join(directory, csv_file_path))
+    data = pd.read_csv(os.path.join(directory, csv_file_path), nrows=500)
     data["index"] = list(data.index)
 
     tf.logging.info("Reading the tweets...")
